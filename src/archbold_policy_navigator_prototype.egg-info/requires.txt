@@ -1,0 +1,9 @@
+streamlit<2,>=1.37
+PyMuPDF<2,>=1.24
+pytesseract<1,>=0.3.13
+Pillow<13,>=10
+python-dotenv<2,>=1
+sentence-transformers<6,>=3.3
+
+[dev]
+pytest<9,>=8

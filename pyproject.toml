@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "archbold-policy-navigator-prototype"
+version = "0.1.0"
+description = "Local-first, source-grounded policy navigation prototype for scanned long-term-care documents."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "streamlit>=1.37,<2",
+  "PyMuPDF>=1.24,<2",
+  "pytesseract>=0.3.13,<1",
+  "Pillow>=10,<13",
+  "python-dotenv>=1,<2",
+  "sentence-transformers>=3.3,<6",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,170 @@
+Metadata-Version: 2.4
+Name: archbold-policy-navigator-prototype
+Version: 0.1.0
+Summary: Local-first, source-grounded policy navigation prototype for scanned long-term-care documents.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: streamlit<2,>=1.37
+Requires-Dist: PyMuPDF<2,>=1.24
+Requires-Dist: pytesseract<1,>=0.3.13
+Requires-Dist: Pillow<13,>=10
+Requires-Dist: python-dotenv<2,>=1
+Requires-Dist: sentence-transformers<6,>=3.3
+Provides-Extra: dev
+Requires-Dist: pytest<9,>=8; extra == "dev"
+
+# Archbold Source Document Chat Prototype
+
+> **PROTOTYPE — NOT FOR CLINICAL USE.** This application retrieves information from selected facility documents. It does not diagnose, prescribe, place orders, determine regulatory compliance, or replace verification in a resident's chart, current orders, MAR, allergies, contraindications, care plan, or provider instructions.
+
+This repository is a local-first vertical slice for scanned long-term-care source documents. It was designed around an image-only, multi-document PDF bundle rather than a clean text PDF.
+
+## What version 0.1 does
+
+- Imports a PDF without modifying the original.
+- Copies it into immutable local managed storage.
+- Renders every page and runs local English OCR with Tesseract.
+- Stores the scan image beside the OCR transcription.
+- Requires a human to verify each page before it can enter search.
+- Lets the local user review and classify pages, including forms that should be excluded from source search.
+- Searches only pages that are human-verified and explicitly searchable inside an approved, active document.
+- Uses SQLite FTS5 BM25 as the primary exact-term ranker.
+- Stores a persistent local embedding vector for each reviewed chunk and uses cosine similarity as a secondary recall signal.
+- Uses an offline answer model to write a concise response from one exact excerpt.
+- Rejects AI output that adds numbers, changes units, omits source actions, weakly overlaps the evidence, or gives advice.
+- Automatically falls back to deterministic exact-source wording when local AI is unavailable or rejected.
+- Keeps the reviewed excerpt, page metadata, scan image, and original PDF attached to the answer.
+- Stores query text only when `LOG_QUERY_TEXT=true`.
+
+Version 0.1 does **not** call a hosted language model, add facts from general medical knowledge, connect to an EHR/MAR, process resident data, or decide that a document is "up to code." Local AI is optional; the deterministic source-only path remains fully functional without it.
+
+## Why the human OCR review gate matters
+
+The sample source is a scan containing medication names, doses, routes, frequencies, timing, thresholds, and tables. OCR can confuse characters or move values between columns. A page is therefore blocked from retrieval until someone compares the transcription against the scan and explicitly verifies it.
+
+## Requirements
+
+- Python 3.11 or later.
+- Tesseract OCR installed and available on `PATH`.
+- Ollama for the optional hybrid local-AI demo.
+- A modern browser.
+
+Install Tesseract:
+
+- macOS with Homebrew: `brew install tesseract`
+- Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+- Windows PowerShell: `winget install --id tesseract-ocr.tesseract --exact`
+
+The app also detects the standard Windows installation directories. If Tesseract is installed elsewhere, set `TESSERACT_CMD` in `.env` to the full path of `tesseract.exe`.
+
+## Setup
+
+Using `uv`:
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -e '.[dev]'
+cp .env.example .env
+```
+
+Using standard Python:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[dev]'
+cp .env.example .env
+```
+
+On Windows PowerShell, activate with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Activation is optional. For the straightforward Windows setup, run these commands from the repository root:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\setup_windows.ps1
+.\scripts\run_windows.ps1
+```
+
+The setup script creates `.venv` when needed, installs the development dependencies, preserves any existing `.env`, and reports whether Tesseract is available.
+
+For the offline hybrid-AI demo, install and start Ollama, then run:
+
+```powershell
+.\scripts\setup_local_ai.ps1
+```
+
+This downloads approximately 676 MB of model files, registers a compact BGE
+retrieval model and Qwen answer model with Ollama, and leaves the hosted-API path
+disabled. See [docs/LOCAL_AI_DEMO.md](docs/LOCAL_AI_DEMO.md) for the grounding
+contract and model-license details.
+
+## Run
+
+```bash
+streamlit run app.py
+```
+
+The app binds through Streamlit's normal local behavior. Keep it on a trusted laptop and do not expose it publicly.
+
+## Workflow
+
+Files uploaded in ChatGPT are separate from this local application. Upload the source PDF directly in the app before reviewing or searching it.
+
+1. Upload a scanned PDF.
+2. Wait for local OCR to complete.
+3. Review every page that should be searchable:
+   - compare the text with the page image;
+   - correct OCR errors;
+   - confirm that the document is approved and current;
+   - enable the reviewed page for questions.
+4. Ask a topic-only question that contains no resident identifiers.
+
+The source chat remains disabled until at least one reviewed page is indexed inside an approved, active document. Hybrid mode ranks only those eligible pages: BM25 supplies the dominant exact-term rank, while cosine similarity supplies a smaller secondary rank for paraphrases. Weighted reciprocal-rank fusion combines the two without comparing their incompatible raw scores. Embeddings are generated lazily, persisted in SQLite, fingerprinted to the reviewed chunk text, and automatically removed when a chunk is replaced. The selected exact excerpt is then supplied to the offline answer model. Added numbers, changed units, omitted actions, unsupported wording, advice, model errors, and low-relevance retrieval automatically fall back to deterministic source wording. Every supported answer cites its page and keeps the exact reviewed wording and source scan available for inspection.
+
+## Command-line import
+
+After installation:
+
+```bash
+python scripts/ingest_file.py /path/to/source.pdf --title "Descriptive title"
+```
+
+The file will still need page-by-page review in the app.
+
+## Tests
+
+```bash
+pytest
+```
+
+The tests use synthetic, non-clinical text. Real Archbold source files and extracted OCR text are excluded from version control.
+
+## Data handling
+
+All imported PDFs, rendered page images, OCR text, and the SQLite database stay under `data/` and are ignored by Git. At runtime the application uses local Tesseract and, when configured, local Ollama models at `127.0.0.1`. It does not send document text to a hosted model or public internet service.
+
+Do not import completed forms, resident charts, MAR exports, or files containing resident identifiers into this prototype.
+
+## Known limitations
+
+- OCR is English-only and may be wrong, especially in tables and low-quality scans.
+- Page review is manual and should be performed by qualified Archbold personnel.
+- BM25 and vector retrieval quality still depends on the reviewed OCR text and passage boundaries.
+- The compact answer model can be wrong; numeric/source validation and exact-source fallback reduce, but do not eliminate, that risk.
+- Ollama and model weights are installed separately and are not committed to this repository.
+- The whole PDF is one managed source bundle even though page-level metadata can represent different logical documents.
+- There is no conflict detector yet.
+- The PHI pattern check is intentionally basic and not a privacy guarantee.
+- The app does not validate policy approval, clinical correctness, legal status, or regulatory compliance.
+- This password-free local prototype has no enterprise identity, access control, audit, retention, or multi-tenant isolation.
+
+## Recommended next milestone
+
+Add a `source_items` grouping layer so multiple pages can be treated as one logical form or protocol, followed by deterministic conflict checks, a reviewed retrieval-evaluation set, and production identity/audit controls before any deployment beyond a local demo.

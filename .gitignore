@@ -1,0 +1,22 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.DS_Store
+
+# Never commit source documents, OCR output, page images, databases, or logs.
+data/inbox/*
+data/originals/*
+data/page_images/*
+data/quarantine/*
+data/*.db
+data/*.db-*
+!data/inbox/.gitkeep
+!data/originals/.gitkeep
+!data/page_images/.gitkeep
+!data/quarantine/.gitkeep
+
+*.log
+models/*.gguf
+models/bge-reranker-v2-m3/
