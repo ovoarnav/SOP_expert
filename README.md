@@ -1,4 +1,4 @@
-# Archbold Source Document Chat Prototype
+# Source Document Chat Prototype
 
 > **PROTOTYPE — NOT FOR CLINICAL USE.** This application retrieves information from selected facility documents. It does not diagnose, prescribe, place orders, determine regulatory compliance, or replace verification in a resident's chart, current orders, MAR, allergies, contraindications, care plan, or provider instructions.
 
